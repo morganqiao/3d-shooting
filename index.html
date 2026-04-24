@@ -6,6 +6,7 @@
     <title>3D Shooter Game with City Environment</title>
     <style>
         body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
@@ -14,60 +15,149 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/GLTFLoader.js"></script>
 
 <script>
-    // Scene Setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+    let scene, camera, renderer, player, enemy, bullets = [], enemies = [], street, light, clock, raycaster, controls;
 
-    // Lighting
-    const light = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(light);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(0, 10, 0);
-    scene.add(directionalLight);
+    // Initialize Scene, Camera, Renderer
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-    // Create the City Environment (basic buildings)
-    const streetMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
-    const buildingMaterial = new THREE.MeshBasicMaterial({ color: 0x7b7b7b });
+        // Add Lighting
+        light = new THREE.AmbientLight(0x404040, 1); // Ambient Light
+        scene.add(light);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(0, 10, 0);
+        scene.add(directionalLight);
 
-    const street = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), streetMaterial);
-    street.rotation.x = -Math.PI / 2;
-    scene.add(street);
+        // Clock for animation
+        clock = new THREE.Clock();
 
-    // Create Buildings (Simple cubes)
-    for (let i = 0; i < 10; i++) {
-        const building = new THREE.Mesh(new THREE.BoxGeometry(10, Math.random() * 50 + 50, 10), buildingMaterial);
-        building.position.set(Math.random() * 2000 - 1000, building.geometry.parameters.height / 2, Math.random() * 2000 - 1000);
-        scene.add(building);
+        // Setup Raycaster for shooting
+        raycaster = new THREE.Raycaster();
+
+        // Create City Environment (Building & Street)
+        createCity();
+        
+        // Load Player Model
+        loadPlayer();
+
+        // Create Enemies
+        createEnemies();
+
+        // Camera Position
+        camera.position.set(0, 5, 100);
+
+        // Call animate function
+        animate();
     }
 
-    // Load Human Model (replace with a real human model)
-    const loader = new THREE.GLTFLoader();
-    let player;
-    loader.load('https://example.com/path/to/your/3dmodel.glb', function(gltf) {
-        player = gltf.scene;
-        player.scale.set(1, 1, 1);
-        player.position.set(0, 1, 0);
-        scene.add(player);
-    });
+    // Create City (Simple buildings and street)
+    function createCity() {
+        // Street (Ground)
+        const streetMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+        street = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), streetMaterial);
+        street.rotation.x = -Math.PI / 2;
+        scene.add(street);
 
-    // Camera Position
-    camera.position.z = 100;
+        // Buildings (Simple Cubes)
+        const buildingMaterial = new THREE.MeshStandardMaterial({ color: 0x7b7b7b });
+        for (let i = 0; i < 20; i++) {
+            const building = new THREE.Mesh(new THREE.BoxGeometry(10, Math.random() * 50 + 50, 10), buildingMaterial);
+            building.position.set(Math.random() * 2000 - 1000, building.geometry.parameters.height / 2, Math.random() * 2000 - 1000);
+            scene.add(building);
+        }
+    }
 
-    // Animate
+    // Load Player (GLTF Model)
+    function loadPlayer() {
+        const loader = new THREE.GLTFLoader();
+        loader.load('https://example.com/path/to/your/3dmodel.glb', function(gltf) {
+            player = gltf.scene;
+            player.scale.set(1, 1, 1);
+            player.position.set(0, 1, 0);
+            scene.add(player);
+        });
+    }
+
+    // Create Enemies (Simple cubes for now)
+    function createEnemies() {
+        const enemyMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        for (let i = 0; i < 5; i++) {
+            const enemy = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), enemyMaterial);
+            enemy.position.set(Math.random() * 2000 - 1000, 10, Math.random() * 2000 - 1000);
+            scene.add(enemy);
+            enemies.push(enemy);
+        }
+    }
+
+    // Shooting Mechanism
+    function shoot() {
+        const direction = new THREE.Vector3(0, 0, -1); // Shoot in the Z direction
+        const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+        bullet.position.copy(player.position);
+        bullet.velocity = direction.multiplyScalar(2);
+        scene.add(bullet);
+        bullets.push(bullet);
+    }
+
+    // Animate Game Loop
     function animate() {
         requestAnimationFrame(animate);
 
+        // Animate Player
         if (player) {
-            player.rotation.y += 0.01;  // Rotate player model for now
+            player.rotation.y += 0.01;  // Rotate player for now
         }
+
+        // Move Enemies towards Player
+        moveEnemies();
+
+        // Update Bullet Position
+        bullets.forEach(bullet => {
+            bullet.position.add(bullet.velocity);
+        });
+
+        // Check for Bullet-Enemy Collision
+        checkCollisions();
 
         renderer.render(scene, camera);
     }
 
-    animate();
+    // Move Enemies (Simple AI to follow player)
+    function moveEnemies() {
+        enemies.forEach(enemy => {
+            const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+            enemy.position.add(direction.multiplyScalar(0.5));
+        });
+    }
+
+    // Check Bullet-Enemy Collisions
+    function checkCollisions() {
+        bullets.forEach((bullet, index) => {
+            enemies.forEach((enemy, enemyIndex) => {
+                if (bullet.position.distanceTo(enemy.position) < 10) {
+                    // Bullet hit the enemy
+                    scene.remove(bullet);
+                    bullets.splice(index, 1);
+                    scene.remove(enemy);
+                    enemies.splice(enemyIndex, 1);
+                }
+            });
+        });
+    }
+
+    // Event Listeners (Shooting on key press)
+    window.addEventListener('keydown', (event) => {
+        if (event.code === 'Space') {
+            shoot();
+        }
+    });
+
+    // Initialize the game
+    init();
 </script>
 
 </body>
