@@ -1,176 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Shooting Game</title>
-  <style>
-    body { margin:0; overflow:hidden; background:#000; }
-    #joystick { position:absolute; bottom:40px; left:40px; width:120px; height:120px; background:rgba(255,255,255,0.1); border-radius:50%; }
-    #stick { width:60px; height:60px; background:rgba(255,255,255,0.4); border-radius:50%; position:absolute; left:30px; top:30px; }
-    #shootBtn { position:absolute; bottom:50px; right:50px; width:80px; height:80px; background:red; border-radius:50%; }
-    #health { position:absolute; top:10px; left:150px; font-size:20px; color:white; }
-    #ammo { position:absolute; top:40px; left:150px; font-size:20px; color:white; }
-    #gold { position:absolute; top:70px; left:150px; font-size:20px; color:white; }
-    #ui { position:absolute; top:10px; left:10px; color:white; font-size:20px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Shooter Game with City Environment</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+    </style>
 </head>
 <body>
 
-  <div id="ui">Loading...</div>
-  <div id="joystick"><div id="stick"></div></div>
-  <div id="shootBtn"></div>
-  <div id="health"></div>
-  <div id="ammo"></div>
-  <div id="gold"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/GLTFLoader.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
-  <script>
-    // ===== THREE.js 初始化 =====
+<script>
+    // Scene Setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // ===== 地面 (大地图) =====
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(5000, 5000),
-      new THREE.MeshBasicMaterial({ color: 0x333333 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
+    // Lighting
+    const light = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(light);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(0, 10, 0);
+    scene.add(directionalLight);
 
-    // ===== 玩家设置 =====
-    const player = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshBasicMaterial({ color: 0x00ffff })
-    );
-    scene.add(player);
-    player.position.set(0, 0.5, 0);
+    // Create the City Environment (basic buildings)
+    const streetMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
+    const buildingMaterial = new THREE.MeshBasicMaterial({ color: 0x7b7b7b });
 
-    // ===== 武器系统 =====
-    let currentWeapon = 'pistol'; // 当前武器
-    const weapons = {
-      pistol: { damage: 10, speed: 1 },
-      rifle: { damage: 20, speed: 1.5 },
-      sniper: { damage: 50, speed: 2 }
-    };
+    const street = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), streetMaterial);
+    street.rotation.x = -Math.PI / 2;
+    scene.add(street);
 
-    // ===== UI 更新 =====
-    let playerHealth = 100;
-    let ammoCount = 30;
-    let gold = 100;
-
-    function updateUI() {
-      document.getElementById('health').innerText = `Health: ${playerHealth}`;
-      document.getElementById('ammo').innerText = `Ammo: ${ammoCount}`;
-      document.getElementById('gold').innerText = `Gold: ${gold}`;
+    // Create Buildings (Simple cubes)
+    for (let i = 0; i < 10; i++) {
+        const building = new THREE.Mesh(new THREE.BoxGeometry(10, Math.random() * 50 + 50, 10), buildingMaterial);
+        building.position.set(Math.random() * 2000 - 1000, building.geometry.parameters.height / 2, Math.random() * 2000 - 1000);
+        scene.add(building);
     }
 
-    // ===== 子弹 =====
-    let bullets = [];
-    function shoot() {
-      if (ammoCount <= 0) return; // 没有子弹时不能射击
-      ammoCount--;
-      const weapon = weapons[currentWeapon];
-      const bullet = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2),
-        new THREE.MeshBasicMaterial({ color: 0xffff00 })
-      );
-      bullet.position.copy(player.position);
-      bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(player.rotation).multiplyScalar(weapon.speed);
-      scene.add(bullet);
-      bullets.push(bullet);
-    }
-
-    // ===== 虚拟摇杆 =====
-    let joy = { x: 0, y: 0 };
-    const stick = document.getElementById("stick");
-
-    document.getElementById("joystick").addEventListener("touchmove", e => {
-      let rect = e.target.getBoundingClientRect();
-      let x = e.touches[0].clientX - rect.left - 60;
-      let y = e.touches[0].clientY - rect.top - 60;
-      joy.x = x / 40;
-      joy.y = y / 40;
-      stick.style.left = (x + 30) + "px";
-      stick.style.top = (y + 30) + "px";
+    // Load Human Model (replace with a real human model)
+    const loader = new THREE.GLTFLoader();
+    let player;
+    loader.load('https://example.com/path/to/your/3dmodel.glb', function(gltf) {
+        player = gltf.scene;
+        player.scale.set(1, 1, 1);
+        player.position.set(0, 1, 0);
+        scene.add(player);
     });
 
-    document.addEventListener("touchend", () => {
-      joy.x = 0;
-      joy.y = 0;
-      stick.style.left = "30px";
-      stick.style.top = "30px";
-    });
+    // Camera Position
+    camera.position.z = 100;
 
-    // ===== 射击按钮 =====
-    document.getElementById("shootBtn").addEventListener("touchstart", shoot);
-
-    // ===== 敌人AI =====
-    let enemies = [];
-    function spawnEnemy() {
-      const enemy = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 })
-      );
-      enemy.position.set(Math.random() * 500 - 250, 0.5, Math.random() * 500 - 250);
-      scene.add(enemy);
-      enemies.push(enemy);
-    }
-    setInterval(spawnEnemy, 1500);
-
-    function moveEnemies() {
-      enemies.forEach(enemy => {
-        const direction = player.position.clone().sub(enemy.position).normalize();
-        enemy.position.add(direction.multiplyScalar(0.1));
-      });
-    }
-
-    // ===== 动态天气 (简单模拟) =====
-    let weather = "clear";
-    function updateWeather() {
-      if (Math.random() < 0.01) {
-        weather = (weather === "clear") ? "rain" : "clear"; // 随机变换天气
-      }
-      if (weather === "rain") {
-        scene.background = new THREE.Color(0x333333); // 阴天
-        // TODO: 添加雨粒效果
-      } else {
-        scene.background = new THREE.Color(0x87ceeb); // 晴天
-      }
-    }
-
-    // ===== 游戏循环 =====
+    // Animate
     function animate() {
-      requestAnimationFrame(animate);
+        requestAnimationFrame(animate);
 
-      // 玩家移动
-      player.position.x += joy.x * 0.1;
-      player.position.z += joy.y * 0.1;
+        if (player) {
+            player.rotation.y += 0.01;  // Rotate player model for now
+        }
 
-      // 敌人移动
-      moveEnemies();
-
-      // 子弹移动
-      bullets.forEach(bullet => {
-        bullet.position.add(bullet.velocity);
-      });
-
-      // 更新UI
-      updateUI();
-
-      // 更新天气
-      updateWeather();
-
-      // 摄像机跟随玩家
-      camera.position.set(player.position.x, 5, player.position.z + 8);
-      camera.lookAt(player.position);
-
-      renderer.render(scene, camera);
+        renderer.render(scene, camera);
     }
+
     animate();
-  </script>
+</script>
+
 </body>
 </html>
